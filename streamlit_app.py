@@ -12,15 +12,14 @@ import pandas as pd
 import numpy as np
 import os
 import requests
-import gdown  # Para descargar de Google Drive
+import urllib.request
 
 # ============================================
 # CONFIGURACIÓN
 # ============================================
 
-# ID de tu archivo en Google Drive (ejemplo: 1ABC123xyz)
-# Reemplaza con tu ID real
-GOOGLE_DRIVE_ID = "1UTq9KnK2hrp0FlBZUb_NQz7izke93AFU"  # ← PEGA TU ID AQUÍ
+# ID de tu archivo en Google Drive
+GOOGLE_DRIVE_ID = "1UTq9KnK2hrp0FlBZUb_NQz7izke93AFU"
 
 CLASS_NAMES = [
     'chuita', 'chuita adulta', 'cushuri adulto', 'cushuri juvenil',
@@ -52,7 +51,6 @@ def load_model():
     luego lo carga con Ultralytics.
     """
     
-    # Nombre del archivo local
     modelo_local = "26n.pt"
     
     # Si ya existe, cargarlo directamente
@@ -64,24 +62,69 @@ def load_model():
     st.info("⬇️ Descargando modelo desde Google Drive... (puede tardar 1-2 minutos)")
     
     try:
-        # URL de descarga directa de Google Drive
-        url = f"https://drive.google.com/uc?id={GOOGLE_DRIVE_ID}"
+        # Método 1: Usar confirmación de Google Drive (para archivos grandes)
+        url = f"https://drive.google.com/uc?export=download&id={GOOGLE_DRIVE_ID}"
         
-        # Descargar con gdown (más confiable para Google Drive)
-        gdown.download(url, modelo_local, quiet=False)
+        # Primera petición para obtener el token de confirmación
+        session = requests.Session()
+        response = session.get(url, stream=True)
+        
+        # Si hay un warning de virus, obtener el token
+        for key, value in response.cookies.items():
+            if key.startswith("download_warning"):
+                token = value
+                url = f"https://drive.google.com/uc?export=download&confirm={token}&id={GOOGLE_DRIVE_ID}"
+                response = session.get(url, stream=True)
+                break
+        
+        # Descargar el archivo
+        total_size = int(response.headers.get('content-length', 0))
+        
+        with open(modelo_local, "wb") as f:
+            if total_size > 0:
+                downloaded = 0
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+                        downloaded += len(chunk)
+            else:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
         
         # Verificar que se descargó correctamente
-        if os.path.exists(modelo_local) and os.path.getsize(modelo_local) > 1000000:  # > 1MB
-            st.success(f"✅ Modelo descargado: {os.path.getsize(modelo_local) / (1024*1024):.1f} MB")
-            return YOLO(modelo_local)
+        if os.path.exists(modelo_local):
+            file_size = os.path.getsize(modelo_local)
+            if file_size > 1000000:  # > 1MB
+                st.success(f"✅ Modelo descargado: {file_size / (1024*1024):.1f} MB")
+                return YOLO(modelo_local)
+            else:
+                st.error(f"❌ Archivo muy pequeño ({file_size} bytes). Puede estar corrupto.")
+                return None
         else:
-            st.error("❌ El modelo descargado parece incompleto o corrupto")
+            st.error("❌ No se pudo descargar el archivo")
             return None
             
     except Exception as e:
         st.error(f"❌ Error descargando modelo: {str(e)}")
-        st.info("💡 Verifica que el ID de Google Drive sea correcto y el archivo sea público")
-        return None
+        st.info("💡 Intentando método alternativo...")
+        
+        # Método 2: Usar gdown con formato diferente
+        try:
+            import gdown
+            url = f"https://drive.google.com/uc?id={GOOGLE_DRIVE_ID}"
+            gdown.download(url, modelo_local, quiet=False, fuzzy=True)
+            
+            if os.path.exists(modelo_local) and os.path.getsize(modelo_local) > 1000000:
+                st.success(f"✅ Modelo descargado con gdown: {os.path.getsize(modelo_local) / (1024*1024):.1f} MB")
+                return YOLO(modelo_local)
+            else:
+                st.error("❌ gdown también falló")
+                return None
+                
+        except Exception as e2:
+            st.error(f"❌ Método alternativo también falló: {str(e2)}")
+            return None
 
 # ============================================
 # FUNCIÓN DE DETECCIÓN
@@ -124,6 +167,7 @@ def detectar_aves(imagen, modelo, confianza_minima, iou_maximo):
     
     tabla = pd.DataFrame(datos)
     return resultados, imagen_anotada, tabla
+
 
 # ============================================
 # INTERFAZ DE LA APP
