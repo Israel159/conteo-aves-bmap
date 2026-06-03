@@ -11,10 +11,16 @@ from PIL import Image
 import pandas as pd
 import numpy as np
 import os
+import requests
+import gdown  # Para descargar de Google Drive
 
 # ============================================
-# CONFIGURACIÓN DE LAS 16 CLASES
+# CONFIGURACIÓN
 # ============================================
+
+# ID de tu archivo en Google Drive (ejemplo: 1ABC123xyz)
+# Reemplaza con tu ID real
+GOOGLE_DRIVE_ID = "1UTq9KnK2hrp0FlBZUb_NQz7izke93AFU"  # ← PEGA TU ID AQUÍ
 
 CLASS_NAMES = [
     'chuita', 'chuita adulta', 'cushuri adulto', 'cushuri juvenil',
@@ -36,69 +42,68 @@ CLASS_COLORS = {
 }
 
 # ============================================
-# CARGAR MODELO (se cachea para no recargar)
+# DESCARGAR Y CARGAR MODELO
 # ============================================
 
 @st.cache_resource
 def load_model():
     """
-    Carga el modelo YOLO 26n.pt.
-    Busca el archivo en varias ubicaciones posibles.
+    Descarga el modelo 26n.pt desde Google Drive si no existe localmente,
+    luego lo carga con Ultralytics.
     """
-    # Lista de posibles ubicaciones del modelo
-    posibles_rutas = [
-        "26n.pt",                                    # Misma carpeta
-        os.path.join(os.path.dirname(__file__), "26n.pt"),  # Ruta absoluta
-    ]
     
-    # Buscar el modelo
-    for ruta in posibles_rutas:
-        if os.path.exists(ruta):
-            return YOLO(ruta)
+    # Nombre del archivo local
+    modelo_local = "26n.pt"
     
-    # Si no lo encuentra, mostrar error
-    st.error("❌ No se encontró el archivo `26n.pt`. Asegúrate de subirlo.")
-    return None
+    # Si ya existe, cargarlo directamente
+    if os.path.exists(modelo_local):
+        st.success("✅ Modelo encontrado localmente")
+        return YOLO(modelo_local)
+    
+    # Si no existe, descargar desde Google Drive
+    st.info("⬇️ Descargando modelo desde Google Drive... (puede tardar 1-2 minutos)")
+    
+    try:
+        # URL de descarga directa de Google Drive
+        url = f"https://drive.google.com/uc?id={GOOGLE_DRIVE_ID}"
+        
+        # Descargar con gdown (más confiable para Google Drive)
+        gdown.download(url, modelo_local, quiet=False)
+        
+        # Verificar que se descargó correctamente
+        if os.path.exists(modelo_local) and os.path.getsize(modelo_local) > 1000000:  # > 1MB
+            st.success(f"✅ Modelo descargado: {os.path.getsize(modelo_local) / (1024*1024):.1f} MB")
+            return YOLO(modelo_local)
+        else:
+            st.error("❌ El modelo descargado parece incompleto o corrupto")
+            return None
+            
+    except Exception as e:
+        st.error(f"❌ Error descargando modelo: {str(e)}")
+        st.info("💡 Verifica que el ID de Google Drive sea correcto y el archivo sea público")
+        return None
 
 # ============================================
-# FUNCIÓN PRINCIPAL: DETECTAR AVES
+# FUNCIÓN DE DETECCIÓN
 # ============================================
 
 def detectar_aves(imagen, modelo, confianza_minima, iou_maximo):
     """
-    Recibe una imagen y devuelve las detecciones.
-    
-    Parámetros:
-        imagen: Imagen PIL cargada
-        modelo: Modelo YOLO cargado
-        confianza_minima: Solo mostrar detecciones con confianza mayor a esto
-        iou_maximo: Umbral para eliminar cajas solapadas
-    
-    Retorna:
-        resultados: Objeto con todas las detecciones
-        imagen_anotada: Imagen con cajas dibujadas
-        tabla: DataFrame con datos de cada detección
+    Detecta aves en una imagen.
     """
-    
-    # Ejecutar predicción con el modelo
     resultados = modelo.predict(
         imagen,
-        conf=confianza_minima,    # Umbral de confianza
-        iou=iou_maximo,           # Umbral de IoU para NMS
-        imgsz=640,                # Tamaño de entrada
-        verbose=False             # No mostrar logs
+        conf=confianza_minima,
+        iou=iou_maximo,
+        imgsz=640,
+        verbose=False
     )[0]
     
-    # Crear imagen con cajas dibujadas
     imagen_anotada = resultados.plot()
     
-    # Extraer datos de cada detección para la tabla
     datos = []
     for caja in resultados.boxes:
-        # Coordenadas de la caja
         x1, y1, x2, y2 = caja.xyxy[0].cpu().numpy()
-        
-        # Datos de la detección
         confianza = float(caja.conf)
         clase_id = int(caja.cls)
         nombre_clase = CLASS_NAMES[clase_id]
@@ -117,30 +122,19 @@ def detectar_aves(imagen, modelo, confianza_minima, iou_maximo):
             'area_pixeles': round((x2 - x1) * (y2 - y1), 2)
         })
     
-    # Crear tabla (DataFrame)
     tabla = pd.DataFrame(datos)
-    
     return resultados, imagen_anotada, tabla
 
 # ============================================
-# INTERFAZ DE LA APP (lo que el usuario ve)
+# INTERFAZ DE LA APP
 # ============================================
 
 def main():
-    """
-    Función principal que construye la interfaz web.
-    """
-    
-    # Configuración de la página
     st.set_page_config(
         page_title="Detector de Aves BMAP",
         page_icon="🐦",
         layout="wide"
     )
-    
-    # ========================================
-    # ENCABEZADO
-    # ========================================
     
     st.title("🐦 Detector Automático de Aves")
     st.markdown("""
@@ -152,14 +146,10 @@ def main():
     
     st.divider()
     
-    # ========================================
-    # BARRA LATERAL (configuración)
-    # ========================================
-    
+    # Sidebar
     with st.sidebar:
         st.header("⚙️ Configuración")
         
-        # Deslizador de confianza
         confianza = st.slider(
             "Confianza mínima",
             min_value=0.1,
@@ -169,7 +159,6 @@ def main():
             help="Solo mostrar detecciones con confianza mayor a este valor"
         )
         
-        # Deslizador de IoU
         iou = st.slider(
             "IoU máximo (NMS)",
             min_value=0.1,
@@ -181,7 +170,6 @@ def main():
         
         st.divider()
         
-        # Lista de clases detectables
         st.header("📋 Especies detectables")
         for nombre in CLASS_NAMES:
             color = CLASS_COLORS.get(nombre, '#5a7d4a')
@@ -199,17 +187,11 @@ def main():
         3. Revisa los resultados y descarga el CSV
         """)
     
-    # ========================================
-    # ÁREA PRINCIPAL
-    # ========================================
-    
     # Cargar modelo
     modelo = load_model()
     
     if modelo is None:
-        st.stop()  # Detener si no hay modelo
-    
-    st.success("✅ Modelo cargado correctamente")
+        st.stop()
     
     # Subir imágenes
     st.header("📤 Subir imágenes")
@@ -220,34 +202,26 @@ def main():
         accept_multiple_files=True
     )
     
-    # Si no hay archivos, mostrar mensaje y detener
     if not archivos_subidos:
         st.info("👆 Sube una o más imágenes para comenzar el análisis")
         st.stop()
     
-    # ========================================
-    # PROCESAR CADA IMAGEN
-    # ========================================
-    
     st.success(f"📁 {len(archivos_subidos)} imagen(es) cargada(s)")
     
-    todas_las_tablas = []  # Para CSV combinado
+    todas_las_tablas = []
     
     for numero, archivo in enumerate(archivos_subidos, 1):
         
         st.divider()
         st.subheader(f"🖼️ Imagen {numero}: `{archivo.name}`")
         
-        # Cargar imagen
         imagen = Image.open(archivo).convert("RGB")
         
-        # Mostrar imagen original
         col_izquierda, col_derecha = st.columns(2)
         
         with col_izquierda:
             st.image(imagen, caption="Original", use_container_width=True)
         
-        # Detectar aves
         with st.spinner(f"🔍 Analizando..."):
             resultados, imagen_con_cajas, tabla = detectar_aves(
                 imagen, modelo, confianza, iou
@@ -260,18 +234,11 @@ def main():
                 use_container_width=True
             )
         
-        # ========================================
-        # ESTADÍSTICAS DE ESTA IMAGEN
-        # ========================================
-        
         if len(tabla) > 0:
-            
-            # Conteo por especie
             conteo = tabla['clase'].value_counts()
             
             st.write("**Conteo por especie:**")
             
-            # Mostrar conteos en columnas de 4
             columnas = st.columns(min(len(conteo), 4))
             for i, (especie, cantidad) in enumerate(conteo.items()):
                 with columnas[i % len(columnas)]:
@@ -293,11 +260,9 @@ def main():
                     </div>
                     """, unsafe_allow_html=True)
             
-            # Tabla detallada
             with st.expander("📋 Ver tabla completa de detecciones"):
                 st.dataframe(tabla, use_container_width=True, hide_index=True)
                 
-                # Botón descargar CSV individual
                 csv = tabla.to_csv(index=False).encode('utf-8')
                 st.download_button(
                     label=f"📥 Descargar CSV - {archivo.name}",
@@ -306,7 +271,6 @@ def main():
                     mime="text/csv"
                 )
             
-            # Guardar para CSV combinado
             tabla_con_nombre = tabla.copy()
             tabla_con_nombre['imagen'] = archivo.name
             todas_las_tablas.append(tabla_con_nombre)
@@ -314,18 +278,12 @@ def main():
         else:
             st.warning("⚠️ No se detectaron aves en esta imagen")
     
-    # ========================================
-    # RESUMEN GLOBAL
-    # ========================================
-    
     if todas_las_tablas:
         st.divider()
         st.header("📊 Resumen Global")
         
-        # Unir todas las tablas
         tabla_total = pd.concat(todas_las_tablas, ignore_index=True)
         
-        # Métricas
         col1, col2, col3 = st.columns(3)
         
         with col1:
@@ -337,11 +295,9 @@ def main():
         with col3:
             st.metric("Especies distintas", tabla_total['clase'].nunique())
         
-        # Gráfico de barras
         conteo_total = tabla_total['clase'].value_counts()
         st.bar_chart(conteo_total)
         
-        # Descargar CSV combinado
         csv_total = tabla_total.to_csv(index=False).encode('utf-8')
         st.download_button(
             label="📥 Descargar CSV completo (todas las imágenes)",
@@ -350,10 +306,6 @@ def main():
             mime="text/csv",
             use_container_width=True
         )
-
-# ============================================
-# EJECUTAR APP
-# ============================================
 
 if __name__ == "__main__":
     main()
