@@ -23,4 +23,4 @@ Sistema de inteligencia artificial para detectar 16 especies de aves marinas y c
 
 ## Modelo
 
-YOLOv8n (26n.pt) entrenado por el equipo BMAP APECO.
+YOLOv26n (26n.pt) entrenado por el equipo marino del BMAP.
