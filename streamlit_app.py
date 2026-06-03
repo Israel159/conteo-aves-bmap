@@ -264,7 +264,7 @@ def main():
         col_izquierda, col_derecha = st.columns(2)
         
         with col_izquierda:
-            st.image(imagen, caption="Original", use_container_width=True)
+            st.image(imagen, caption="Original", use_column_width=True)
         
         with st.spinner(f"🔍 Analizando..."):
             resultados, imagen_con_cajas, tabla = detectar_aves(
@@ -275,7 +275,7 @@ def main():
             st.image(
                 imagen_con_cajas,
                 caption=f"Detecciones: {len(tabla)}",
-                use_container_width=True
+                use_column_width=True
             )
         
         if len(tabla) > 0:
