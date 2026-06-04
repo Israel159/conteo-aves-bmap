@@ -184,7 +184,7 @@ def main():
     st.markdown("""
     **BMAP APECO - Programa de Monitoreo Marino**
     
-    Esta herramienta detecta automáticamente **16 especies de aves marinas y costeras**
+    Esta herramienta detecta automáticamente **9 especies de aves marinas y su estadío respectivo (Juvenil, Adulto, etc)**
     en fotografías usando inteligencia artificial (YOLOv26 tamaño nano).
     """)
     
