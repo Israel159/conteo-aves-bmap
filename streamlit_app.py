@@ -18,8 +18,14 @@ import urllib.request
 # CONFIGURACIÓN
 # ============================================
 
-# ID de tu archivo en Google Drive
-GOOGLE_DRIVE_ID = "1UTq9KnK2hrp0FlBZUb_NQz7izke93AFU"
+# ID de los archivos en Google Drive en un diccionario
+MODELOS = {
+    "26n": {"id": "1UTq9KnK2hrp0FlBZUb_NQz7izke93AFU", "nombre": "26n.pt"},
+    "26s": {"id": "1BOWii-fgQ39_C71ZuaImfuf_XW-oYhNe", "nombre": "26s.pt"},
+    "26m": {"id": "18hoJB9KWl2z1yL5A_rYdbpZ-0HNFlWIx", "nombre": "26m.pt"},
+    "26l": {"id": "PON_AQUI_EL_ID", "nombre": "26l.pt"},
+    "26x": {"id": "PON_AQUI_EL_ID", "nombre": "26x.pt"},
+}
 
 CLASS_NAMES = [
     'chuita', 'chuita adulta', 'cushuri adulto', 'cushuri juvenil',
@@ -41,91 +47,70 @@ CLASS_COLORS = {
 }
 
 # ============================================
-# DESCARGAR Y CARGAR MODELO
+# DESCARGAR Y CARGAR TODOS LOS MODELOS
 # ============================================
-
 @st.cache_resource
-def load_model():
+def cargar_todos_los_modelos():
     """
-    Descarga el modelo 26n.pt desde Google Drive si no existe localmente,
-    luego lo carga con Ultralytics.
+    Descarga y carga todos los modelos (n, s, m, l, x) desde Google Drive.
+    Retorna un diccionario {tamaño: modelo_YOLO}.
     """
+    modelos_cargados = {}
     
-    modelo_local = "26n.pt"
-    
-    # Si ya existe, cargarlo directamente
-    if os.path.exists(modelo_local):
-        st.success("✅ Modelo encontrado localmente")
-        return YOLO(modelo_local)
-    
-    # Si no existe, descargar desde Google Drive
-    st.info("⬇️ Descargando modelo desde Google Drive... (puede tardar 1-2 minutos)")
-    
-    try:
-        # Método 1: Usar confirmación de Google Drive (para archivos grandes)
-        url = f"https://drive.google.com/uc?export=download&id={GOOGLE_DRIVE_ID}"
+    for tamaño, info in MODELOS.items():
+        modelo_local = info["nombre"]
+        drive_id = info["id"]
         
-        # Primera petición para obtener el token de confirmación
-        session = requests.Session()
-        response = session.get(url, stream=True)
-        
-        # Si hay un warning de virus, obtener el token
-        for key, value in response.cookies.items():
-            if key.startswith("download_warning"):
-                token = value
-                url = f"https://drive.google.com/uc?export=download&confirm={token}&id={GOOGLE_DRIVE_ID}"
-                response = session.get(url, stream=True)
-                break
-        
-        # Descargar el archivo
-        total_size = int(response.headers.get('content-length', 0))
-        
-        with open(modelo_local, "wb") as f:
-            if total_size > 0:
-                downloaded = 0
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:
-                        f.write(chunk)
-                        downloaded += len(chunk)
-            else:
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:
-                        f.write(chunk)
-        
-        # Verificar que se descargó correctamente
+        # Si ya existe localmente, cargarlo directamente
         if os.path.exists(modelo_local):
-            file_size = os.path.getsize(modelo_local)
-            if file_size > 1000000:  # > 1MB
-                st.success(f"✅ Modelo descargado: {file_size / (1024*1024):.1f} MB")
-                return YOLO(modelo_local)
-            else:
-                st.error(f"❌ Archivo muy pequeño ({file_size} bytes). Puede estar corrupto.")
-                return None
-        else:
-            st.error("❌ No se pudo descargar el archivo")
-            return None
-            
-    except Exception as e:
-        st.error(f"❌ Error descargando modelo: {str(e)}")
-        st.info("💡 Intentando método alternativo...")
+            st.success(f"✅ Modelo {tamaño} encontrado localmente")
+            modelos_cargados[tamaño] = YOLO(modelo_local)
+            continue
         
-        # Método 2: Usar gdown con formato diferente
+        # Si no existe, descargar desde Google Drive
+        st.info(f"⬇️ Descargando modelo {tamaño} desde Google Drive...")
+        
         try:
-            import gdown
-            url = f"https://drive.google.com/uc?id={GOOGLE_DRIVE_ID}"
-            gdown.download(url, modelo_local, quiet=False, fuzzy=True)
+            url = f"https://drive.google.com/uc?export=download&id={drive_id}"
+            session = requests.Session()
+            response = session.get(url, stream=True)
+            
+            for key, value in response.cookies.items():
+                if key.startswith("download_warning"):
+                    token = value
+                    url = f"https://drive.google.com/uc?export=download&confirm={token}&id={drive_id}"
+                    response = session.get(url, stream=True)
+                    break
+            
+            with open(modelo_local, "wb") as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
             
             if os.path.exists(modelo_local) and os.path.getsize(modelo_local) > 1000000:
-                st.success(f"✅ Modelo descargado con gdown: {os.path.getsize(modelo_local) / (1024*1024):.1f} MB")
-                return YOLO(modelo_local)
+                st.success(f"✅ Modelo {tamaño} descargado: {os.path.getsize(modelo_local) / (1024*1024):.1f} MB")
+                modelos_cargados[tamaño] = YOLO(modelo_local)
             else:
-                st.error("❌ gdown también falló")
-                return None
+                st.error(f"❌ Archivo {tamaño} corrupto o muy pequeño")
                 
-        except Exception as e2:
-            st.error(f"❌ Método alternativo también falló: {str(e2)}")
-            return None
-
+        except Exception as e:
+            st.error(f"❌ Error descargando {tamaño}: {str(e)}")
+            st.info("💡 Intentando con gdown...")
+            
+            try:
+                import gdown
+                url = f"https://drive.google.com/uc?id={drive_id}"
+                gdown.download(url, modelo_local, quiet=False, fuzzy=True)
+                
+                if os.path.exists(modelo_local) and os.path.getsize(modelo_local) > 1000000:
+                    st.success(f"✅ Modelo {tamaño} descargado con gdown")
+                    modelos_cargados[tamaño] = YOLO(modelo_local)
+                else:
+                    st.error(f"❌ gdown también falló para {tamaño}")
+            except Exception as e2:
+                st.error(f"❌ No se pudo cargar {tamaño}: {str(e2)}")
+    
+    return modelos_cargados
 # ============================================
 # FUNCIÓN DE DETECCIÓN
 # ============================================
@@ -194,6 +179,14 @@ def main():
     with st.sidebar:
         st.header("⚙️ Configuración")
         
+        # Selector de tamaño de modelo
+        modelo_seleccionado = st.selectbox(
+            "Tamaño del modelo YOLO",
+            options=["26n", "26s", "26m", "26l", "26x"],
+            index=0,
+            help="n=nano (más rápido), x=extra large (más preciso)"
+        )
+        
         confianza = st.slider(
             "Confianza mínima",
             min_value=0.1,
@@ -203,14 +196,8 @@ def main():
             help="Solo mostrar detecciones con confianza mayor a este valor"
         )
         
-        iou = st.slider(
-            "IoU máximo (NMS)",
-            min_value=0.1,
-            max_value=0.9,
-            value=0.45,
-            step=0.05,
-            help="Umbral para eliminar detecciones solapadas"
-        )
+        # IOU fijo, ya no es configurable por el usuario
+        iou = 0.45
         
         st.divider()
         
@@ -226,16 +213,25 @@ def main():
         
         st.info("""
         💡 **Instrucciones:**
-        1. Sube una o más imágenes JPG/PNG
-        2. Ajusta los umbrales si es necesario
+        1. Selecciona el tamaño de modelo
+        2. Sube una o más imágenes JPG/PNG
         3. Revisa los resultados y descarga el CSV
         """)
     
-    # Cargar modelo
-    modelo = load_model()
+    # Cargar TODOS los modelos al iniciar
+    todos_los_modelos = cargar_todos_los_modelos()
     
-    if modelo is None:
+    if not todos_los_modelos:
+        st.error("❌ No se pudo cargar ningún modelo")
         st.stop()
+    
+    # Seleccionar el modelo activo según lo que eligió el usuario
+    if modelo_seleccionado not in todos_los_modelos:
+        st.error(f"❌ Modelo {modelo_seleccionado} no disponible")
+        st.stop()
+    
+    modelo = todos_los_modelos[modelo_seleccionado]
+    st.success(f"🚀 Usando modelo: YOLOv8 {modelo_seleccionado.upper()}")
     
     # Subir imágenes
     st.header("📤 Subir imágenes")
