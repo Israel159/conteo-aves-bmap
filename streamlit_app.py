@@ -63,14 +63,38 @@ def cargar_todos_los_modelos():
         
         # Si ya existe localmente, cargarlo directamente
         if os.path.exists(modelo_local):
-            st.success(f"✅ Modelo {tamaño} encontrado localmente")
+            file_size = os.path.getsize(modelo_local) / (1024*1024)
+            st.success(f"✅ Modelo {tamaño} encontrado localmente ({file_size:.1f} MB)")
             modelos_cargados[tamaño] = YOLO(modelo_local)
             continue
         
         # Si no existe, descargar desde Google Drive
-        st.info(f"⬇️ Descargando modelo {tamaño} desde Google Drive...")
+        st.info(f"⬇️ Descargando modelo {tamaño} desde Google Drive... (puede tardar varios minutos)")
         
+        # MÉTODO 1: gdown (mejor para archivos grandes)
         try:
+            import gdown
+            url = f"https://drive.google.com/uc?id={drive_id}"
+            gdown.download(url, modelo_local, quiet=False, fuzzy=True)
+            
+            if os.path.exists(modelo_local):
+                file_size = os.path.getsize(modelo_local)
+                if file_size > 1000000:  # > 1MB
+                    st.success(f"✅ Modelo {tamaño} descargado con gdown: {file_size / (1024*1024):.1f} MB")
+                    modelos_cargados[tamaño] = YOLO(modelo_local)
+                    continue
+                else:
+                    st.warning(f"⚠️ gdown descargó un archivo muy pequeño para {tamaño} ({file_size} bytes)")
+                    # No hacemos continue, pasamos al método 2
+            else:
+                st.warning(f"⚠️ gdown no pudo descargar {tamaño}")
+                
+        except Exception as e:
+            st.warning(f"⚠️ gdown falló para {tamaño}: {str(e)}")
+        
+        # MÉTODO 2: requests con confirmación de virus (fallback)
+        try:
+            st.info(f"🔄 Intentando descarga alternativa para {tamaño}...")
             url = f"https://drive.google.com/uc?export=download&id={drive_id}"
             session = requests.Session()
             response = session.get(url, stream=True)
@@ -87,28 +111,18 @@ def cargar_todos_los_modelos():
                     if chunk:
                         f.write(chunk)
             
-            if os.path.exists(modelo_local) and os.path.getsize(modelo_local) > 1000000:
-                st.success(f"✅ Modelo {tamaño} descargado: {os.path.getsize(modelo_local) / (1024*1024):.1f} MB")
-                modelos_cargados[tamaño] = YOLO(modelo_local)
-            else:
-                st.error(f"❌ Archivo {tamaño} corrupto o muy pequeño")
-                
-        except Exception as e:
-            st.error(f"❌ Error descargando {tamaño}: {str(e)}")
-            st.info("💡 Intentando con gdown...")
-            
-            try:
-                import gdown
-                url = f"https://drive.google.com/uc?id={drive_id}"
-                gdown.download(url, modelo_local, quiet=False, fuzzy=True)
-                
-                if os.path.exists(modelo_local) and os.path.getsize(modelo_local) > 1000000:
-                    st.success(f"✅ Modelo {tamaño} descargado con gdown")
+            if os.path.exists(modelo_local):
+                file_size = os.path.getsize(modelo_local)
+                if file_size > 1000000:
+                    st.success(f"✅ Modelo {tamaño} descargado (método alternativo): {file_size / (1024*1024):.1f} MB")
                     modelos_cargados[tamaño] = YOLO(modelo_local)
                 else:
-                    st.error(f"❌ gdown también falló para {tamaño}")
-            except Exception as e2:
-                st.error(f"❌ No se pudo cargar {tamaño}: {str(e2)}")
+                    st.error(f"❌ Archivo {tamaño} corrupto o muy pequeño ({file_size} bytes)")
+            else:
+                st.error(f"❌ No se pudo descargar {tamaño}")
+                
+        except Exception as e:
+            st.error(f"❌ Todos los métodos fallaron para {tamaño}: {str(e)}")
     
     return modelos_cargados
 # ============================================
