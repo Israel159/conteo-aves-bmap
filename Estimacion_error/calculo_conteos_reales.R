@@ -1,6 +1,7 @@
 library(tidyr)
 library(dplyr)
 library(jsonlite)
+library(readxl)
 
 # Diccionario completo de especies
 diccionario_especies <- c(
@@ -10,16 +11,16 @@ diccionario_especies <- c(
   "BLVU"  = "Gallinazo de cabeza negra",
   "BROPE" = "pelicano",
   "CHAL"  = "Chorlitejo patinegro",
-  "CHUCO" = "Chuita",
+  "CHUCO" = "chuita",
   "FRGU"  = "Gaviota de Franklin",
   "GRGU"  = "Garuma",
-  "GUCO"  = "Guanay",
+  "GUCO"  = "guanay",
   "HUPE"  = "pinguino",
   "INTE"  = "zarcillo",
   "KEGU"  = "Gaviota dominicana",
   "NECO"  = "cushuri",
   "PEBO"  = "piquero",
-  "PEGU"  = "Gaviota peruana",
+  "PEGU"  = "gaviota peruana",
   "PEFA"  = "Halcón peregrino",
   "PEPE"  = "pelicano",
   "PLAMA" = "Playerito manchado",
@@ -36,10 +37,12 @@ diccionario_especies <- c(
 )
 
 
-#RLOF Abril 2025-------------------------------------------------
+#Abril 2025-------------------------------------------------
 
-##(Exte Inte afue)----------------------------------------------------
-datos <- read.delim("clipboard")
+##RLOF-------------------------------------------------------
+
+### (Exte Inte afue)----------------------------------------------------
+datos <- read_excel("datos_aves_marinas/2025/abril/RLOF/RLOF.xlsx",sheet = "datos_limpios")
 #Solo fotos 119,124,127
 exte_inte_afue_abril_2025 <- datos %>% filter(FOTO==119|FOTO==124|FOTO==127)
 totales <- exte_inte_afue_abril_2025 %>% group_by(FOTO,ESPECIE) %>% summarise(Adultos=sum(ADULTOS,na.rm = T),
@@ -65,8 +68,7 @@ totales_1 <- totales %>%
 
 
 
-## Exte aden-----------------
-datos <- read.delim("clipboard")
+### Exte aden-----------------
 exte_aden_abril_2025 <- datos %>% filter(LADO=="EXTE ADEN")
 totales_exte_aden_abril_2025 <- exte_aden_abril_2025 %>% group_by(FOTO,ESPECIE)%>% summarise(Adultos=sum(ADULTOS,na.rm = T),
                                                                           Juveniles=sum(JUVENILES,na.rm=T))
@@ -88,8 +90,9 @@ totales_2 <- totales_exte_aden_abril_2025 %>%
 
 
 abril_2025_RLOF <- rbind(totales_1,totales_2)
+abril_2025_RLOF <- abril_2025_RLOF %>% arrange(FOTO)
 
-writexl::write_xlsx(abril_2025_RLOF,"abril_2025_RLOF.xlsx")
+writexl::write_xlsx(abril_2025_RLOF,"datos_aves_marinas/2025/abril/RLOF/conteos_reales.xlsx")
 
 #Rompeolas abril 2025 -------------------------
 datos <- read.delim("clipboard")
