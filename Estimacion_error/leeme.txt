@@ -1,0 +1,13 @@
+la estructura recomendada para correr Estimaciones.ipynb en colab es:
+├── modelos/
+│   ├── data.yaml
+│   ├── 26n.pt
+│   ├── 26s.pt
+│   ├── 26m.pt
+│   ├── 26l.pt
+│   └── 26x.pt
+├── fotos/
+│   ├── 1.jpg
+│   ├── 3.jpg
+│   └── ...
+└── conteos_reales.xlsx
