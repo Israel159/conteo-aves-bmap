@@ -1,6 +1,6 @@
 library(stringr)
 # Carpeta donde están las imágenes
-carpeta <- "datos_aves_marinas\\2025\\abril\\RLOF\\fotos"
+carpeta <- "datos_aves_marinas\\2026\\abril\\Rompeolas\\fotos"
 
 # Listar todos los archivos
 archivos <- list.files(carpeta, full.names = TRUE)
