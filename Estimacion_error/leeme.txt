@@ -10,4 +10,14 @@ la estructura recomendada para correr Estimaciones.ipynb en colab es:
 │   ├── 1.jpg
 │   ├── 3.jpg
 │   └── ...
-└── conteos_reales.xlsx
+
+
+
+Hasta el momento los mejores modelos son :
+- X_0.48 Para zarcillos , este modelo fue entrenado con :
+Auto orient:
+Auto-orientación
+Teja 2x2
+
+En aumento:
+- Voltear
