@@ -246,10 +246,10 @@ writexl::write_xlsx(abril_2026_Rompeolas,"datos_aves_marinas/2026/abril/Rompeola
 # Calculo del Metricas de regresión:------------------
 ## Abril 2025--------------------------------
 ### Rlof -------------------
-estimaciones_rlof_abrl_2025 <- read_excel("datos_aves_marinas/2025/abril/RLOF/estimaciones_sahi.xlsx")
+estimaciones_rlof_abrl_2025 <- read_excel("datos_aves_marinas/2025/abril/RLOF/estimaciones_balanc.xlsx")
 estimaciones_rlof_abrl_2025$FOTO <- as.numeric(estimaciones_rlof_abrl_2025$FOTO)
 unido_rlof_abrl_2025 <- left_join(estimaciones_rlof_abrl_2025, abril_2025_RLOF, by = c("FOTO", "Clase"))
-unido_rlof_abrl_2025$Real[is.na(unido_rlof_abrl_2025$Real)] <- 0
+unido_rlof_abrl_2025 <- unido_rlof_abrl_2025 %>% filter(!is.na(Real))
 cols_estimacion <- names(unido_rlof_abrl_2025)[str_detect(names(unido_rlof_abrl_2025), "^(n|s|m|l|x)_")]
 
 # Calcular métricas por clase y tamaño de confianza
@@ -296,10 +296,10 @@ writexl::write_xlsx(optimo_por_clase, "datos_aves_marinas/2025/abril/RLOF/optimo
 writexl::write_xlsx(metricas_por_clase, "datos_aves_marinas/2025/abril/RLOF/metricas_todos_umbrales.xlsx")
 
 ### Rompeolas -------------------
-estimaciones_rompeolas_abrl_2025 <- read_excel("datos_aves_marinas/2025/abril/Rompeolas/estimaciones_sahi.xlsx")
+estimaciones_rompeolas_abrl_2025 <- read_excel("datos_aves_marinas/2025/abril/Rompeolas/estimaciones_balanc_sahi.xlsx")
 estimaciones_rompeolas_abrl_2025$FOTO <- as.numeric(estimaciones_rompeolas_abrl_2025$FOTO)
 unido_rompeolas_abrl_2025 <- left_join(estimaciones_rompeolas_abrl_2025, abril_2025_Rompeolas, by = c("FOTO", "Clase"))
-unido_rompeolas_abrl_2025$Real[is.na(unido_rompeolas_abrl_2025$Real)] <- 0
+unido_rompeolas_abrl_2025 <- unido_rompeolas_abrl_2025 %>% filter(!is.na(Real))
 cols_estimacion <- names(unido_rompeolas_abrl_2025)[str_detect(names(unido_rompeolas_abrl_2025), "^(n|s|m|l|x)_")]
 
 # Calcular métricas por clase y tamaño de confianza
@@ -335,7 +335,7 @@ optimo_por_clase <- metricas_por_clase %>%
   slice_min(sMAPE, n = 1, with_ties = FALSE) %>%
   ungroup() %>%
   select(Clase, tamano_confianza, sMAPE, MAE, RMSE, n)
-optimo_por_clase
+optimo_por_clase$Clase
 
 
 # ver toda la curva de una clase específica

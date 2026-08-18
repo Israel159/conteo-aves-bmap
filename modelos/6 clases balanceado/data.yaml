@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 4
+names: ['pelicano adulto', 'pelicano juvenil', 'pinguino adulto', 'pinguino juvenil', 'piquero adulto', 'piquero juvenil']
+
+roboflow:
+  workspace: seabirdsccs
+  project: ai-seabirds
+  version: 7
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/seabirdsccs/ai-seabirds/dataset/7
