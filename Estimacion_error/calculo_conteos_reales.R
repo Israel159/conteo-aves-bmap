@@ -345,6 +345,48 @@ metricas_por_clase %>% filter(Clase == "zarcillo") %>% arrange(sMAPE)
 writexl::write_xlsx(optimo_por_clase, "datos_aves_marinas/2025/abril/Rompeolas/optimo_smape_por_clase.xlsx")
 writexl::write_xlsx(metricas_por_clase, "datos_aves_marinas/2025/abril/Rompeolas/metricas_todos_umbrales.xlsx")
 
+### Rompeolas + RLOF -------------------
+estimaciones_rompeolas_rlof_abrl_2025 <- read_excel("datos_aves_marinas/2025/abril/rlof_rompeolas_balanceado_sahi.xlsx")
+estimaciones_rompeolas_rlof_abrl_2025$FOTO <- as.numeric(estimaciones_rompeolas_rlof_abrl_2025$FOTO)
+abril_2025_Rompeolas_rlof <- read_excel("datos_aves_marinas/2025/abril/conteos_reales_rlof+rompeolas.xlsx")
+unido_rompeolas_abrl_2025 <- left_join(estimaciones_rompeolas_rlof_abrl_2025, abril_2025_Rompeolas_rlof, by = c("FOTO", "Clase"))
+unido_rompeolas_abrl_2025 <- unido_rompeolas_abrl_2025 %>% filter(FOTO %in% unique(abril_2025_Rompeolas_rlof$FOTO))
+cols_estimacion <- names(unido_rompeolas_abrl_2025)[str_detect(names(unido_rompeolas_abrl_2025), "^(n|s|m|l|x)_")]
+
+# Calcular métricas por clase y tamaño de confianza
+metricas_por_clase <- unido_rompeolas_abrl_2025 %>%
+  select(FOTO, Clase, Real, all_of(cols_estimacion)) %>%
+  pivot_longer(
+    cols = all_of(cols_estimacion),
+    names_to = "tamano_confianza",
+    values_to = "estimacion"
+  ) %>%
+  # ESTRATEGIA: excluir fila solo cuando AMBOS son cero
+  filter(!(Real == 0 & estimacion == 0)) %>%
+  group_by(Clase, tamano_confianza) %>%
+  summarise(
+    # MAE en unidades de aves (3 decimales)
+    MAE = round(mean(abs(Real - estimacion)), 3),
+    
+    # sMAPE como porcentaje (0-200%). 
+    # Fórmula: 200 * mean( |Real - Estimado| / (Real + Estimado) )
+    sMAPE = round(mean(2 * abs(Real - estimacion) / (Real + estimacion)) * 100, 2),
+    
+    # RMSE como referencia adicional
+    RMSE = round(sqrt(mean((Real - estimacion)^2)), 3),
+    
+    # Número de observaciones válidas para este umbral
+    n = n(),
+    .groups = "drop"
+  )
+
+# Encontrar el tamaño de confianza ÓPTIMO por clase (menor sMAPE)
+optimo_por_clase <- metricas_por_clase %>%
+  group_by(Clase) %>%
+  slice_min(sMAPE, n = 1, with_ties = FALSE) %>%
+  ungroup() %>%
+  select(Clase, tamano_confianza, sMAPE, MAE, RMSE, n)
+optimo_por_clase
 
 ## Abril 2026------------------------
 ### Rlof -------------------
